@@ -22,11 +22,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.IOUtils;
@@ -39,7 +42,11 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -62,6 +69,7 @@ import org.apache.hadoop.yarn.client.api.async.NMClientAsync;
 import org.apache.hadoop.yarn.client.api.async.impl.NMClientAsyncImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.hadoop.yarn.util.Records;
@@ -97,7 +105,7 @@ public class ApplicationMaster {
 	private String appMasterTrackingUrl = "";
 
 	// App Master configuration No. of containers to run shell command on
-	private int numTotalContainers;
+	private int numTotalContainers = 1;
 	
 	// Counter for completed containers (complete denotes successful or failed)
 	private AtomicInteger numCompletedContainers = new AtomicInteger();
@@ -113,13 +121,21 @@ public class ApplicationMaster {
 
 	// Indicates if job is done
 	private volatile boolean done;
-	
 
 	// Launch threads
 	private List<Thread> launchThreads = new ArrayList<Thread>();
+	
+	private ByteBuffer allTokens;
+
+	
+	
+	//private Dictionary<String, InputSplit>
+	private HashMap<String, LinkedBlockingQueue<InputSplit>> hostInputSplit = new HashMap<String, LinkedBlockingQueue<InputSplit>>();
+	
+	
 
 
-	public static void main(String[] args) throws YarnException, IOException {
+	public static void main(String[] args) throws YarnException, IOException, InterruptedException {
 		ApplicationMaster appMaster = new ApplicationMaster(args);
 		appMaster.run();
 		appMaster.finish();
@@ -129,12 +145,28 @@ public class ApplicationMaster {
 		this.conf = new YarnConfiguration();
 		this.appId = args[0];
 		this.fileName = args[1];
-		
 	}
 
 	@SuppressWarnings("unchecked")
-	public void run() throws YarnException, IOException {
+	public void run() throws YarnException, IOException, InterruptedException {
 		LOG.info("Starting ApplicationMaster");
+		
+		Credentials credentials = UserGroupInformation.getCurrentUser().getCredentials();
+		DataOutputBuffer dob = new DataOutputBuffer();
+		credentials.writeTokenStorageToStream(dob);
+		
+		// Now remove the AM->RM token so that containers cannot access it.
+		Iterator<Token<?>> iter = credentials.getAllTokens().iterator();
+		LOG.info("Executing with tokens:");
+		while (iter.hasNext()) {
+			Token<?> token = iter.next();
+			LOG.info(token);
+			if (token.getKind().equals(AMRMTokenIdentifier.KIND_NAME)) {
+				iter.remove();
+			}
+		}
+		allTokens = ByteBuffer.wrap(dob.getData(), 0, dob.getLength());
+	    
 		
 		AMRMClientAsync.CallbackHandler allocListener = new RMCallbackHandler();
 		rmClient = AMRMClientAsync.createAMRMClientAsync(1000, allocListener);
@@ -145,7 +177,13 @@ public class ApplicationMaster {
 		nmClientAsync = new NMClientAsyncImpl(containerListener);
 		nmClientAsync.init(conf);
 		nmClientAsync.start();
-
+		
+		// Get hostname where ApplicationMaster is running
+		String appMasterHostname = NetUtils.getHostname();
+		
+		// Register self with ResourceManager. This will start heartbeating to the RM
+		rmClient.registerApplicationMaster(appMasterHostname, -1, appMasterTrackingUrl);
+		
 		// Priority for worker containers - priorities are intra-application
 	    Priority priority = Records.newRecord(Priority.class);
 	    priority.setPriority(0);
@@ -174,20 +212,23 @@ public class ApplicationMaster {
 		
 		for(BlockLocation blockLocation : blockLocationArray) {
 			ContainerRequest containerAsk = new ContainerRequest(capability, blockLocation.getHosts(), null, priority, false);
+
 			rmClient.addContainerRequest(containerAsk);
+
+			String hostName = blockLocation.getHosts()[0];
+		
+			if(!hostInputSplit.containsKey(hostName)) {
+				hostInputSplit.put(hostName, new LinkedBlockingQueue<InputSplit>());
+			}
+			hostInputSplit.get(hostName).put(new InputSplit(blockLocation.getOffset(), blockLocation.getLength()));
 			
 			for(String s : blockLocation.getHosts())
-				LOG.debug("HostLocation: " + s);
+				LOG.debug("HostLocation: " + s + ", offset: " + blockLocation.getOffset() + ", length: " + blockLocation.getLength());
 		}
 
 		numRequestedContainers.set(numTotalContainers);
 		
-		// Get hostname where ApplicationMaster is running
-		String appMasterHostname = NetUtils.getHostname();
-		
-		// Register self with ResourceManager. This will start heartbeating to the RM
-		rmClient.registerApplicationMaster(appMasterHostname, -1, appMasterTrackingUrl);
-		
+		System.out.println("aaaaaaaaaaaaaaaa bbbb");
 	}
 	
 	//Thread to connect to the {@link ContainerManagementProtocol} and launch the container that will execute the shell command.
@@ -216,7 +257,8 @@ public class ApplicationMaster {
 		 * start request to the CM. 
 		 */
 		public void run() {
-			LOG.info("Setting up container launch container for containerid=" + container.getId());
+			LOG.info("Setting up container launch container for containerid=" + container.getId() + ", " + container.getNodeId() + ", " + container.getNodeHttpAddress());
+			
 			ContainerLaunchContext ctx = Records.newRecord(ContainerLaunchContext.class);
 
 			Map<String, String> env = new HashMap<String, String>();
@@ -228,53 +270,61 @@ public class ApplicationMaster {
 				classPathEnv.append(c.trim());
 			}
 			env.put("CLASSPATH", classPathEnv.toString());
-			
 
-			
-			
 			// Set the environment
 			ctx.setEnvironment(env);
 			
+			// Instance of FileSystem
+			FileSystem fs = null;
+			try {
+				fs = FileSystem.get(conf);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 
 			// Set local resources for the application master local files or archives as needed. In this scenario, the jar file for the application master is part of the local resources
 			Map<String, LocalResource> localResources = new HashMap<String, LocalResource>();
 			
+			// TODO: consertar este workaround
+			Random random = new Random();
+			int randomInt = random.nextInt();
+			
 			// Copy the application master jar to the filesystem. Create a local resource to point to the destination jar path
-			LOG.info("Copying AppMaster jar from local filesystem and add to local environment");
-			addToLocalResources(fs, "huffmanyarn.jar", "AppMaster.jar", appId.toString(), localResources, null);
+			LOG.info("Copying AppMaster jar from local filesystem and add to local environment: job" + randomInt + ".jar");
+			try {
+				
+				addToLocalResources(fs, "AppMaster.jar", "job" + randomInt + ".jar", appId.toString(), localResources, null);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 			
 			// Set local resource info into app master container launch context
-			//container.setLocalResources(localResources);
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			//List<String> commands = new ArrayList<String>();
-			//commands.add("export CLASSPATH=\"$PWD:$HADOOP_CONF_DIR:$HADOOP_COMMON_HOME/share/hadoop/common/*:$HADOOP_COMMON_HOME/share/hadoop/common/lib/*:$HADOOP_HDFS_HOME/share/hadoop/hdfs/*:$HADOOP_HDFS_HOME/share/hadoop/hdfs/lib/*:$HADOOP_YARN_HOME/share/hadoop/yarn/*:$HADOOP_YARN_HOME/share/hadoop/yarn/lib/*:$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/*:$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/lib/*:job.jar/job.jar:job.jar/classes/:job.jar/lib/*:$PWD/*\" && /usr/bin/java -jar /home/admin/Workspace/HuffmanYarn/release/codec.jar " + fileName + " 1>>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stdout 2>>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stderr"); 
-			//commands.add("/bin/date 1>>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stdout 2>>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stderr");
+			ctx.setLocalResources(localResources);
 			
 			// Set the necessary command to execute the application master
 			Vector<CharSequence> vargs = new Vector<CharSequence>(30);
 
 			// Set java executable command
-			//vargs.add(Environment.JAVA_HOME.$$() + "/bin/java");
-			vargs.add("/usr/bin/sleep 20");
+			//vargs.add("/usr/bin/sleep 20 && ");
+			vargs.add(Environment.JAVA_HOME.$$() + "/bin/java");
+
 			
 			// Set java args
-			//vargs.add("-Xmx" + 128 + "m");
-			//vargs.add("br.ufrj.ppgi.huffmanyarn.encoder.Encoder");
-			//vargs.add(appId.toString());
-			//vargs.add(fileName);
-			//for (Map.Entry<String, String> entry : shellEnv.entrySet()) {
-			//	vargs.add("--shell_env " + entry.getKey() + "=" + entry.getValue());
-			//}
-			//vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stdout");
-			//vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stderr");
+			vargs.add("-Xmx" + 128 + "m");
+			vargs.add("br.ufrj.ppgi.huffmanyarn.encoder.Encoder");
+			vargs.add(fileName);
+			
+			InputSplit inputSplit = null;
+			try {
+				inputSplit = hostInputSplit.get(container.getNodeId().getHost()).take();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+			vargs.add(Long.toString(inputSplit.offset));
+			vargs.add(Long.toString(inputSplit.length));
+			
+			vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stdout");
+			vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stderr");
 
 			// Get final commmand
 			StringBuilder command = new StringBuilder();
@@ -282,20 +332,20 @@ public class ApplicationMaster {
 				command.append(str).append(" ");
 			}
 
-			LOG.info("Completed setting up containers command " + command.toString());
+			LOG.info("Completed setting up container command: " + command.toString());
 			List<String> commands = new ArrayList<String>();
 			commands.add(command.toString());
 			ctx.setCommands(commands);
 			
-			//ctx.setCommands(commands);
-
+			ctx.setTokens(allTokens.duplicate());
+			
 			containerListener.addContainer(container.getId(), container);
 			nmClientAsync.startContainerAsync(container, ctx);
 		}
 		
 		private void addToLocalResources(FileSystem fs, String fileSrcPath, String fileDstPath, String appId, Map<String, LocalResource> localResources, String resources)
 				throws IOException {
-			String suffix = "HuffmanYarn/" + appId + "/" + fileDstPath;
+			String suffix = "/user/admin/HuffmanYarn/" + appId + "/" + fileDstPath;
 			LOG.info("Pathhhh do codec: " + suffix);
 			LOG.debug("Pathhhh do codec: " + suffix);
 			Path dst = new Path(fs.getHomeDirectory(), suffix);
