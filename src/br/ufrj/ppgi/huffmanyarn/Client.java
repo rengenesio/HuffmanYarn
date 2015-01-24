@@ -64,11 +64,6 @@ public class Client {
 	// File to be compressed
 	private String fileName;
 
-	// Args to be passed to the shell command
-	//private String[] shellArgs = new String[] {};
-	// Env variables to be setup for the shell command 
-	private Map<String, String> shellEnv = new HashMap<String, String>();
-
 	// Start time for client
 	private final long clientStartTime = System.currentTimeMillis();
 	
@@ -191,7 +186,7 @@ public class Client {
 
 			// Check app status every 1 second.
 			try {
-				Thread.sleep(1000);
+				Thread.sleep(5000);
 			} catch (InterruptedException e) {
 				LOG.debug("Thread sleep in monitoring loop interrupted");
 			}
@@ -235,11 +230,11 @@ public class Client {
 				return false;
 			}
 
-			if (System.currentTimeMillis() > (clientStartTime + clientTimeout)) {
-				LOG.info("Reached client specified timeout for application. Killing application");
-				forceKillApplication(appId);
-				return false;
-			}
+//			if (System.currentTimeMillis() > (clientStartTime + clientTimeout)) {
+//				LOG.info("Reached client specified timeout for application. Killing application");
+//				forceKillApplication(appId);
+//				return false;
+//			}
 		}
 
 	}

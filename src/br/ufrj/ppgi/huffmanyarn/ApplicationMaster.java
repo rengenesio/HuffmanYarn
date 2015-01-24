@@ -87,6 +87,9 @@ public class ApplicationMaster {
 	
 	// FileName to be compressed
 	private String fileName;
+	
+	// 
+	private String masterContainerHostName;
 
 	// Handle to communicate with the Resource Manager
 	@SuppressWarnings("rawtypes")
@@ -133,18 +136,18 @@ public class ApplicationMaster {
 	private HashMap<String, LinkedBlockingQueue<InputSplit>> hostInputSplit = new HashMap<String, LinkedBlockingQueue<InputSplit>>();
 	
 	
+	
+	public ApplicationMaster(String[] args) {
+		this.conf = new YarnConfiguration();
+		this.appId = args[0];
+		this.fileName = args[1];
+	}
 
 
 	public static void main(String[] args) throws YarnException, IOException, InterruptedException {
 		ApplicationMaster appMaster = new ApplicationMaster(args);
 		appMaster.run();
 		appMaster.finish();
-	}
-
-	public ApplicationMaster(String[] args) {
-		this.conf = new YarnConfiguration();
-		this.appId = args[0];
-		this.fileName = args[1];
 	}
 
 	@SuppressWarnings("unchecked")
@@ -190,7 +193,7 @@ public class ApplicationMaster {
 
 	    // Resource requirements for worker containers
 	    Resource capability = Records.newRecord(Resource.class);
-	    capability.setMemory(160);
+	    capability.setMemory(512);
 	    capability.setVirtualCores(1);
 
 	    // Resolver for hostname/rack
@@ -212,11 +215,12 @@ public class ApplicationMaster {
 		
 		for(BlockLocation blockLocation : blockLocationArray) {
 			ContainerRequest containerAsk = new ContainerRequest(capability, blockLocation.getHosts(), null, priority, false);
-
 			rmClient.addContainerRequest(containerAsk);
 
 			String hostName = blockLocation.getHosts()[0];
-		
+			if(blockLocation.getOffset() == 0) {
+				this.masterContainerHostName = hostName;
+			}
 			if(!hostInputSplit.containsKey(hostName)) {
 				hostInputSplit.put(hostName, new LinkedBlockingQueue<InputSplit>());
 			}
@@ -227,8 +231,6 @@ public class ApplicationMaster {
 		}
 
 		numRequestedContainers.set(numTotalContainers);
-		
-		System.out.println("aaaaaaaaaaaaaaaa bbbb");
 	}
 	
 	//Thread to connect to the {@link ContainerManagementProtocol} and launch the container that will execute the shell command.
@@ -305,12 +307,11 @@ public class ApplicationMaster {
 			Vector<CharSequence> vargs = new Vector<CharSequence>(30);
 
 			// Set java executable command
-			//vargs.add("/usr/bin/sleep 20 && ");
 			vargs.add(Environment.JAVA_HOME.$$() + "/bin/java");
 
 			
 			// Set java args
-			vargs.add("-Xmx" + 128 + "m");
+			vargs.add("-Xmx" + 768 + "m");
 			vargs.add("br.ufrj.ppgi.huffmanyarn.encoder.Encoder");
 			vargs.add(fileName);
 			
@@ -322,6 +323,11 @@ public class ApplicationMaster {
 			}
 			vargs.add(Long.toString(inputSplit.offset));
 			vargs.add(Long.toString(inputSplit.length));
+			
+			vargs.add(masterContainerHostName);
+			vargs.add(Integer.toString(numTotalContainers));
+			
+
 			
 			vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stdout");
 			vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stderr");
@@ -505,6 +511,7 @@ public class ApplicationMaster {
 
 		@Override
 		public void onError(Throwable e) {
+			System.out.println("DEU ERROOOOOOOOOOOOO!");
 			done = true;
 			rmClient.stop();
 		}
