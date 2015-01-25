@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package br.ufrj.ppgi.huffmanyarn;
+package br.ufrj.ppgi.huffmanyarn.yarn;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -73,6 +73,8 @@ import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.hadoop.yarn.util.Records;
+
+import br.ufrj.ppgi.huffmanyarn.InputSplit;
 
 
 public class ApplicationMaster {

@@ -8,10 +8,10 @@ public class Codification implements Serializable {
 	 * 
 	 */
 	private static final long serialVersionUID = 5L;
-	byte symbol;
-	byte size;
-	byte lengthInBytes;
-	byte[] code;
+	public byte symbol;
+	public byte size;
+	public byte lengthInBytes;
+	public byte[] code;
 	
 	public Codification() {
 	}
@@ -34,8 +34,9 @@ public class Codification implements Serializable {
 		byte[] b = new byte[this.size + 2];
 		b[0] = this.symbol;
 		b[1] = this.size;
-		for (int i = 0; i < this.size; i++)
-			b[i + 2] = code[i];
+		System.arraycopy(this.code, 0, b, 2, this.size);
+		//for (int i = 0; i < this.size; i++)
+		//	b[i + 2] = code[i];
 
 		return b;
 	}
@@ -53,6 +54,4 @@ public class Codification implements Serializable {
 			
 		return (stringBuilder.toString());
 	}
-	
-	
 }

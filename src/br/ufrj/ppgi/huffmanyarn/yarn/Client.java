@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package br.ufrj.ppgi.huffmanyarn;
+package br.ufrj.ppgi.huffmanyarn.yarn;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -55,6 +55,7 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 
 
+//public class Client {
 public class Client {
 	private static final Log LOG = LogFactory.getLog(Client.class);
 
@@ -64,13 +65,7 @@ public class Client {
 	// File to be compressed
 	private String fileName;
 
-	// Start time for client
-	private final long clientStartTime = System.currentTimeMillis();
-	
-	// Timeout threshold for client. Kill app after time interval expires.
-	private long clientTimeout = 600000;
 
-	
 	public Client(String[] args) throws Exception {
 		this.fileName = args[0];
 	}
@@ -144,7 +139,7 @@ public class Client {
 		
 		// Set java args
 		vargs.add("-Xmx" + 10 + "m");
-		vargs.add("br.ufrj.ppgi.huffmanyarn.ApplicationMaster");
+		vargs.add(ApplicationMaster.class.getName());
 		vargs.add(appId.toString());
 		vargs.add(this.fileName);
 		vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/AppMaster.stdout");
@@ -229,29 +224,9 @@ public class Client {
 						+ dsStatus.toString() + ". Breaking monitoring loop");
 				return false;
 			}
-
-//			if (System.currentTimeMillis() > (clientStartTime + clientTimeout)) {
-//				LOG.info("Reached client specified timeout for application. Killing application");
-//				forceKillApplication(appId);
-//				return false;
-//			}
 		}
-
 	}
 
-	/**
-	 * Kill a submitted application by sending a call to the ASM
-	 * 
-	 * @param appId
-	 *            Application Id to be killed.
-	 * @throws YarnException
-	 * @throws IOException
-	 */
-	private void forceKillApplication(ApplicationId appId)
-			throws YarnException, IOException {
-		// Response can be ignored as it is non-null on success or throws an exception in case of failures
-		yarnClient.killApplication(appId);
-	}
 
 	private void addToLocalResources(FileSystem fs, String fileSrcPath, String fileDstPath, String appId, Map<String, LocalResource> localResources, String resources)
 			throws IOException {
@@ -270,29 +245,26 @@ public class Client {
 			fs.copyFromLocalFile(new Path(fileSrcPath), dst);
 		}
 		FileStatus scFileStatus = fs.getFileStatus(dst);
-		LocalResource scRsrc = LocalResource.newInstance(
-				ConverterUtils.getYarnUrlFromURI(dst.toUri()),
-				LocalResourceType.FILE, LocalResourceVisibility.APPLICATION,
-				scFileStatus.getLen(), scFileStatus.getModificationTime());
+		LocalResource scRsrc = LocalResource.newInstance(ConverterUtils.getYarnUrlFromURI(dst.toUri()), LocalResourceType.FILE, LocalResourceVisibility.APPLICATION, scFileStatus.getLen(), scFileStatus.getModificationTime());
 		localResources.put(fileDstPath, scRsrc);
 	}
 	
 	
-	/**
-	 * @param args
-	 *            Command line arguments
-	 * @throws Exception 
-	 */
-	public static void main(String[] args) throws Exception {
-		Client client = new Client(args);
-		
-		if (client.run()) {
-			LOG.info("Compressão completa!");
-		}
-		else {
-			LOG.error("Erro durante a compressão");
-		}
-		
-		System.exit(0);
-	}
+//	/**
+//	 * @param args
+//	 *            Command line arguments
+//	 * @throws Exception 
+//	 */
+//	public static void main(String[] args) throws Exception {
+//		Client client = new Client(args);
+//		
+//		if (client.run()) {
+//			LOG.info("Compressão completa!");
+//		}
+//		else {
+//			LOG.error("Erro durante a compressão");
+//		}
+//		
+//		System.exit(0);
+//	}
 }
