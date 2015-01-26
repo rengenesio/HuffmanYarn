@@ -12,6 +12,7 @@ import br.ufrj.ppgi.huffmanyarn.yarn.Client;
 public class Main {
 
 	public static void main(String[] args) throws Exception {
+		System.out.println("Encoder boladao!!");
 		long t, t1, t2;
 		String in, out, cb;
 		Configuration conf = new Configuration();
