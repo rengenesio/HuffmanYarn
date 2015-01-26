@@ -1,7 +1,9 @@
-upload_project.sh
-
 bin/
 release/
+.settings/
+
+upload_project.sh
+.project
 
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
