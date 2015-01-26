@@ -1,22 +1,5 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package br.ufrj.ppgi.huffmanyarn.yarn;
+
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -54,8 +37,9 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 
+import br.ufrj.ppgi.huffmanyarn.Defines;
 
-//public class Client {
+
 public class Client {
 	private static final Log LOG = LogFactory.getLog(Client.class);
 
@@ -65,14 +49,17 @@ public class Client {
 	// File to be compressed
 	private String fileName;
 
-
+	// Constructor
 	public Client(String[] args) throws Exception {
 		this.fileName = args[0];
 	}
 
+	// Client run method
 	public boolean run() throws YarnException, IOException {
+		// Instantiates a configuration for this job
 		Configuration conf = new YarnConfiguration();
 		
+		// Initializes the yarnClient
 		yarnClient = YarnClient.createYarnClient();
 		yarnClient.init(conf);
 		yarnClient.start();
@@ -84,20 +71,20 @@ public class Client {
 		ApplicationSubmissionContext appContext = app.getApplicationSubmissionContext();
 		ApplicationId appId = appContext.getApplicationId();
 		appContext.setKeepContainersAcrossApplicationAttempts(false);
-		appContext.setApplicationName("HuffmanYarn");
+		appContext.setApplicationName(Defines.jobName);
 		
 		// Set up the container launch context for the application master
 		ContainerLaunchContext amContainer = Records.newRecord(ContainerLaunchContext.class);
 
 		// Set up resource requirements, priority and queue
 		Resource capability = Records.newRecord(Resource.class);
-		capability.setMemory(10);
-		capability.setVirtualCores(1);
+		capability.setMemory(Defines.amMemory);
+		capability.setVirtualCores(Defines.amVCores);
 		appContext.setResource(capability);
 		Priority pri = Records.newRecord(Priority.class);
-		pri.setPriority(0);
+		pri.setPriority(Defines.amPriority);
 		appContext.setPriority(pri);
-		appContext.setQueue("default");
+		appContext.setQueue(Defines.amQueue);
 				
 		// Set container for context
 		appContext.setAMContainerSpec(amContainer);
@@ -110,7 +97,7 @@ public class Client {
 		
 		// Copy the application master jar to the filesystem. Create a local resource to point to the destination jar path
 		LOG.info("Copying AppMaster jar from local filesystem and add to local environment");
-		addToLocalResources(fs, "huffmanyarn.jar", "AppMaster.jar", appId.toString(), localResources, null);
+		addToLocalResources(fs, "huffmanyarn.jar", "job.jar", appId.toString(), localResources, null);
 		
 		// Set local resource info into app master container launch context
 		amContainer.setLocalResources(localResources);
@@ -135,14 +122,23 @@ public class Client {
 
 		// Set java executable command
 		vargs.add(Environment.JAVA_HOME.$$() + "/bin/java");
-		//vargs.add("/usr/bin/echo $CLASSPATH");
 		
-		// Set java args
-		vargs.add("-Xmx" + 10 + "m");
+		// Java virtual machine args
+		vargs.add("-Xmx" + Defines.amMemory + "m");
+		
+		// Class to execute
 		vargs.add(ApplicationMaster.class.getName());
+		
+		// Job id
 		vargs.add(appId.toString());
+		
+		// File to be compressed
 		vargs.add(this.fileName);
+		
+		// Stdout file
 		vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/AppMaster.stdout");
+		
+		// Stderr file
 		vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/AppMaster.stderr");
 
 		// Get final commmand
@@ -164,22 +160,12 @@ public class Client {
 		return monitorApplication(appId);
 	}
 
-	/**
-	 * Monitor the submitted application for completion. Kill application if
-	 * time expires.
-	 * 
-	 * @param appId
-	 *            Application Id of application to be monitored
-	 * @return true if application completed successfully
-	 * @throws YarnException
-	 * @throws IOException
-	 */
 	private boolean monitorApplication(ApplicationId appId)
 			throws YarnException, IOException {
 
 		while (true) {
 
-			// Check app status every 1 second.
+			// Check app status
 			try {
 				Thread.sleep(5000);
 			} catch (InterruptedException e) {
@@ -204,8 +190,7 @@ public class Client {
 					+ ", appUser=" + report.getUser());
 
 			YarnApplicationState state = report.getYarnApplicationState();
-			FinalApplicationStatus dsStatus = report
-					.getFinalApplicationStatus();
+			FinalApplicationStatus dsStatus = report.getFinalApplicationStatus();
 			if (YarnApplicationState.FINISHED == state) {
 				if (FinalApplicationStatus.SUCCEEDED == dsStatus) {
 					LOG.info("Application has completed successfully. Breaking monitoring loop");
@@ -217,26 +202,20 @@ public class Client {
 							+ ". Breaking monitoring loop");
 					return false;
 				}
-			} else if (YarnApplicationState.KILLED == state
-					|| YarnApplicationState.FAILED == state) {
-				LOG.info("Application did not finish." + " YarnState="
-						+ state.toString() + ", DSFinalStatus="
-						+ dsStatus.toString() + ". Breaking monitoring loop");
+			} else if (YarnApplicationState.KILLED == state || YarnApplicationState.FAILED == state) {
+				LOG.info("Application did not finish." + " YarnState=" + state.toString() + ", DSFinalStatus=" + dsStatus.toString() + ". Breaking monitoring loop");
 				return false;
 			}
 		}
 	}
 
-
-	private void addToLocalResources(FileSystem fs, String fileSrcPath, String fileDstPath, String appId, Map<String, LocalResource> localResources, String resources)
-			throws IOException {
+	private void addToLocalResources(FileSystem fs, String fileSrcPath, String fileDstPath, String appId, Map<String, LocalResource> localResources, String resources) throws IOException {
 		String suffix = "HuffmanYarn/" + appId + "/" + fileDstPath;
 		Path dst = new Path(fs.getHomeDirectory(), suffix);
 		if (fileSrcPath == null) {
 			FSDataOutputStream ostream = null;
 			try {
-				ostream = FileSystem.create(fs, dst, new FsPermission(
-						(short) 0710));
+				ostream = FileSystem.create(fs, dst, new FsPermission((short) 0710));
 				ostream.writeUTF(resources);
 			} finally {
 				IOUtils.closeQuietly(ostream);
@@ -244,27 +223,9 @@ public class Client {
 		} else {
 			fs.copyFromLocalFile(new Path(fileSrcPath), dst);
 		}
+		
 		FileStatus scFileStatus = fs.getFileStatus(dst);
 		LocalResource scRsrc = LocalResource.newInstance(ConverterUtils.getYarnUrlFromURI(dst.toUri()), LocalResourceType.FILE, LocalResourceVisibility.APPLICATION, scFileStatus.getLen(), scFileStatus.getModificationTime());
 		localResources.put(fileDstPath, scRsrc);
 	}
-	
-	
-//	/**
-//	 * @param args
-//	 *            Command line arguments
-//	 * @throws Exception 
-//	 */
-//	public static void main(String[] args) throws Exception {
-//		Client client = new Client(args);
-//		
-//		if (client.run()) {
-//			LOG.info("Compressão completa!");
-//		}
-//		else {
-//			LOG.error("Erro durante a compressão");
-//		}
-//		
-//		System.exit(0);
-//	}
 }

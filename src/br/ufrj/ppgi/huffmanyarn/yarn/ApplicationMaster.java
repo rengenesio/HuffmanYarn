@@ -74,7 +74,9 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.hadoop.yarn.util.Records;
 
+import br.ufrj.ppgi.huffmanyarn.Defines;
 import br.ufrj.ppgi.huffmanyarn.InputSplit;
+import br.ufrj.ppgi.huffmanyarn.encoder.Encoder;
 
 
 public class ApplicationMaster {
@@ -132,13 +134,10 @@ public class ApplicationMaster {
 	
 	private ByteBuffer allTokens;
 
-	
-	
-	//private Dictionary<String, InputSplit>
+	// Maps a host to a file input split (offset and length)
 	private HashMap<String, LinkedBlockingQueue<InputSplit>> hostInputSplit = new HashMap<String, LinkedBlockingQueue<InputSplit>>();
 	
-	
-	
+
 	public ApplicationMaster(String[] args) {
 		this.conf = new YarnConfiguration();
 		this.appId = args[0];
@@ -195,8 +194,8 @@ public class ApplicationMaster {
 
 	    // Resource requirements for worker containers
 	    Resource capability = Records.newRecord(Resource.class);
-	    capability.setMemory(512);
-	    capability.setVirtualCores(1);
+	    capability.setMemory(Defines.containerMemory);
+	    capability.setVirtualCores(Defines.containerVCores);
 
 	    // Resolver for hostname/rack
 		RackResolver.init(conf);
@@ -205,13 +204,10 @@ public class ApplicationMaster {
 		Path path = new Path(fileName);
 		FileSystem fileSystem = FileSystem.get(path.toUri(), conf);
 		
-		LOG.info("path: " + path.toString());
-		LOG.info("path.toUri(): " + path.toUri().toString());
-		
 		FileStatus fileStatus = fileSystem.getFileStatus(path);
 		BlockLocation[] blockLocationArray = fileSystem.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
 		
-		LOG.info("blkLocations: " + blockLocationArray.length);
+		LOG.info("# of blocks: " + blockLocationArray.length);
 		numTotalContainers = blockLocationArray.length;
 		LOG.info("numTotalContainers: " + numTotalContainers);
 		
@@ -297,7 +293,7 @@ public class ApplicationMaster {
 			LOG.info("Copying AppMaster jar from local filesystem and add to local environment: job" + randomInt + ".jar");
 			try {
 				
-				addToLocalResources(fs, "AppMaster.jar", "job" + randomInt + ".jar", appId.toString(), localResources, null);
+				addToLocalResources(fs, "job.jar", "job" + randomInt + ".jar", appId.toString(), localResources, null);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -305,33 +301,43 @@ public class ApplicationMaster {
 			// Set local resource info into app master container launch context
 			ctx.setLocalResources(localResources);
 			
-			// Set the necessary command to execute the application master
+			// Set the necessary command to execute the container
 			Vector<CharSequence> vargs = new Vector<CharSequence>(30);
 
 			// Set java executable command
 			vargs.add(Environment.JAVA_HOME.$$() + "/bin/java");
 
+			// Java virtual machine args
+			vargs.add("-Xmx" + Defines.containerMemory + "m");
 			
-			// Set java args
-			vargs.add("-Xmx" + 768 + "m");
-			vargs.add("br.ufrj.ppgi.huffmanyarn.encoder.Encoder");
+			// Class to execute
+			vargs.add(Encoder.class.getName());
+			
+			// File to be compressed
 			vargs.add(fileName);
 			
+			// Input split for container
 			InputSplit inputSplit = null;
 			try {
 				inputSplit = hostInputSplit.get(container.getNodeId().getHost()).take();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
+			// Total input file offset
 			vargs.add(Long.toString(inputSplit.offset));
+			// Input file length
 			vargs.add(Long.toString(inputSplit.length));
 			
+			// Master container hostname
 			vargs.add(masterContainerHostName);
+			
+			// Number of launched containers
 			vargs.add(Integer.toString(numTotalContainers));
 			
-
-			
+			// Stdout file
 			vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stdout");
+			
+			// Stderr file
 			vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stderr");
 
 			// Get final commmand
@@ -351,11 +357,8 @@ public class ApplicationMaster {
 			nmClientAsync.startContainerAsync(container, ctx);
 		}
 		
-		private void addToLocalResources(FileSystem fs, String fileSrcPath, String fileDstPath, String appId, Map<String, LocalResource> localResources, String resources)
-				throws IOException {
+		private void addToLocalResources(FileSystem fs, String fileSrcPath, String fileDstPath, String appId, Map<String, LocalResource> localResources, String resources) throws IOException {
 			String suffix = "/user/admin/HuffmanYarn/" + appId + "/" + fileDstPath;
-			LOG.info("Pathhhh do codec: " + suffix);
-			LOG.debug("Pathhhh do codec: " + suffix);
 			Path dst = new Path(fs.getHomeDirectory(), suffix);
 			if (fileSrcPath == null) {
 				FSDataOutputStream ostream = null;
@@ -368,23 +371,20 @@ public class ApplicationMaster {
 			} else {
 				fs.copyFromLocalFile(new Path(fileSrcPath), dst);
 			}
+			
 			FileStatus scFileStatus = fs.getFileStatus(dst);
-			LocalResource scRsrc = LocalResource.newInstance(
-					ConverterUtils.getYarnUrlFromURI(dst.toUri()),
-					LocalResourceType.FILE, LocalResourceVisibility.APPLICATION,
-					scFileStatus.getLen(), scFileStatus.getModificationTime());
+			LocalResource scRsrc = LocalResource.newInstance(ConverterUtils.getYarnUrlFromURI(dst.toUri()), LocalResourceType.FILE, LocalResourceVisibility.APPLICATION, scFileStatus.getLen(), scFileStatus.getModificationTime());
 			localResources.put(fileDstPath, scRsrc);
 		}
 	}
 		
-
+	// Wait for job completion
 	protected boolean finish() {
-		// wait for completion.
+
 		while (!done && (numCompletedContainers.get() != numTotalContainers)) {
 			try {
 				Thread.sleep(200);
-			} catch (InterruptedException ex) {
-			}
+			} catch (InterruptedException ex) { }
 		}
 
 		// Join all launched threads needed for when we time out and we need to release containers
@@ -408,8 +408,7 @@ public class ApplicationMaster {
 		FinalApplicationStatus appStatus;
 		String appMessage = null;
 		boolean success = true;
-		if (numFailedContainers.get() == 0
-				&& numCompletedContainers.get() == numTotalContainers) {
+		if (numFailedContainers.get() == 0 && numCompletedContainers.get() == numTotalContainers) {
 			appStatus = FinalApplicationStatus.SUCCEEDED;
 		} else {
 			appStatus = FinalApplicationStatus.FAILED;

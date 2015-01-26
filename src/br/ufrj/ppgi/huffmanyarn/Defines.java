@@ -1,5 +1,14 @@
 package br.ufrj.ppgi.huffmanyarn;
 
 public class Defines {
-	//public const int 
+	public static final String jobName = "HuffmanYarn"; 
+	
+	public static final int amMemory = 10;
+	public static final int amVCores = 1;
+	public static final int amPriority = 0;
+	public static final String amQueue = "default";
+	
+	
+	public static final int containerMemory = 512;
+	public static final int containerVCores = 1;
 }
