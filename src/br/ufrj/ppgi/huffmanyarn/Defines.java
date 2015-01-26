@@ -1,5 +1,6 @@
 package br.ufrj.ppgi.huffmanyarn;
 
+
 public class Defines {
 	public static final String jobName = "HuffmanYarn"; 
 	

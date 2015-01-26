@@ -1,6 +1,8 @@
 package br.ufrj.ppgi.huffmanyarn.encoder;
 
+
 import java.util.ArrayList;
+
 
 public class NodeArray extends ArrayList<Node> {
 

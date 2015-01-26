@@ -1,13 +1,10 @@
 package br.ufrj.ppgi.huffmanyarn.encoder;
 
-import java.util.Arrays;
-import java.io.Serializable;
 
-public class Codification implements Serializable {
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = 5L;
+import java.util.Arrays;
+
+
+public class Codification {
 	public byte symbol;
 	public byte size;
 	public byte lengthInBytes;

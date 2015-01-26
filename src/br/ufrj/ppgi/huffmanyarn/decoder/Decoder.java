@@ -1,5 +1,6 @@
 package br.ufrj.ppgi.huffmanyarn.decoder;
 
+
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;

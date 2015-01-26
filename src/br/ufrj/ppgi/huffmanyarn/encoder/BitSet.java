@@ -1,5 +1,6 @@
 package br.ufrj.ppgi.huffmanyarn.encoder;
 
+
 public class BitSet {
 	byte b;
 

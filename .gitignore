@@ -1,5 +1,8 @@
 upload_project.sh
 
+bin/
+release/
+
 *.class
 
 # Mobile Tools for Java (J2ME)

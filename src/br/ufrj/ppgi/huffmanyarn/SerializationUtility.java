@@ -1,5 +1,6 @@
 package br.ufrj.ppgi.huffmanyarn;
 
+
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
