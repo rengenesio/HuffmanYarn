@@ -372,7 +372,7 @@ public final class Encoder {
 	
     public void memoryCompressor() throws IOException {
     	FileSystem fs = FileSystem.get(this.conf);
-		Path path = new Path(fileName + ".dir/compressed/part-" + String.format("%08", this.inputPartId));
+		Path path = new Path(fileName + ".dir/compressed/part-" + String.format("%08d", this.inputPartId));
 		
 		FSDataOutputStream f = fs.create(path);
 		
