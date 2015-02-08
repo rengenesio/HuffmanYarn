@@ -21,6 +21,7 @@ public final class Encoder {
 	private Configuration conf;
 	
 	private String fileName;
+	private int inputPartId;
 	private long inputOffset;
 	private int inputLength;
 	private String masterHostName;
@@ -40,10 +41,11 @@ public final class Encoder {
 		this.conf = new Configuration();
 		
 		this.fileName = args[0];
-		this.inputOffset = Long.parseLong(args[1]);
-		this.inputLength = Integer.parseInt(args[2]);
-		this.masterHostName = args[3];
-		this.numTotalContainers = Integer.parseInt(args[4]);
+		this.inputPartId = Integer.parseInt(args[1]);
+		this.inputOffset = Long.parseLong(args[2]);
+		this.inputLength = Integer.parseInt(args[3]);
+		this.masterHostName = args[4];
+		this.numTotalContainers = Integer.parseInt(args[5]);
 	}
 	
 	public void encode() throws IOException, InterruptedException {
@@ -370,7 +372,7 @@ public final class Encoder {
 	
     public void memoryCompressor() throws IOException {
     	FileSystem fs = FileSystem.get(this.conf);
-		Path path = new Path(fileName + ".dir/compressed/part-" + this.inputOffset);
+		Path path = new Path(fileName + ".dir/compressed/part-" + String.format("%08", this.inputPartId));
 		
 		FSDataOutputStream f = fs.create(path);
 		

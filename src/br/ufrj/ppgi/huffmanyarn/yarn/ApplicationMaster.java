@@ -4,7 +4,6 @@ package br.ufrj.ppgi.huffmanyarn.yarn;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -313,6 +312,8 @@ public class ApplicationMaster {
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
+			// Container Id (indicates the input split part)
+			vargs.add(Integer.toString(inputSplit.part));
 			// Total input file offset
 			vargs.add(Long.toString(inputSplit.offset));
 			// Input file length
