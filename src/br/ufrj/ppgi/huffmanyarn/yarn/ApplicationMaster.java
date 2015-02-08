@@ -210,8 +210,10 @@ public class ApplicationMaster {
 			}
 			hostInputSplit.get(hostName).put(new InputSplit(i, blockLocation.getOffset(), blockLocation.getLength()));
 			
-			for(String s : blockLocation.getHosts())
+			for(String s : blockLocation.getHosts()) {
 				LOG.debug("HostLocation " + i + ": " + s + ", offset: " + blockLocation.getOffset() + ", length: " + blockLocation.getLength());
+				System.out.println("HostLocation " + i + ": " + s + ", offset: " + blockLocation.getOffset() + ", length: " + blockLocation.getLength());
+			}
 			
 			i++;
 		}
