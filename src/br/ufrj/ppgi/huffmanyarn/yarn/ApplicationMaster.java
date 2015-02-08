@@ -4,6 +4,7 @@ package br.ufrj.ppgi.huffmanyarn.yarn;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -194,6 +195,8 @@ public class ApplicationMaster {
 		numTotalContainers = blockLocationArray.length;
 		LOG.info("numTotalContainers: " + numTotalContainers);
 		
+
+		int i = 0;
 		for(BlockLocation blockLocation : blockLocationArray) {
 			ContainerRequest containerAsk = new ContainerRequest(capability, blockLocation.getHosts(), null, priority, false);
 			rmClient.addContainerRequest(containerAsk);
@@ -205,10 +208,12 @@ public class ApplicationMaster {
 			if(!hostInputSplit.containsKey(hostName)) {
 				hostInputSplit.put(hostName, new LinkedBlockingQueue<InputSplit>());
 			}
-			hostInputSplit.get(hostName).put(new InputSplit(blockLocation.getOffset(), blockLocation.getLength()));
+			hostInputSplit.get(hostName).put(new InputSplit(i, blockLocation.getOffset(), blockLocation.getLength()));
 			
 			for(String s : blockLocation.getHosts())
-				LOG.debug("HostLocation: " + s + ", offset: " + blockLocation.getOffset() + ", length: " + blockLocation.getLength());
+				LOG.debug("HostLocation " + i + ": " + s + ", offset: " + blockLocation.getOffset() + ", length: " + blockLocation.getLength());
+			
+			i++;
 		}
 
 		numRequestedContainers.set(numTotalContainers);
