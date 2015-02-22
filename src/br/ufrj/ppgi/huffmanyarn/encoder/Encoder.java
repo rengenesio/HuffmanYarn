@@ -115,7 +115,7 @@ public final class Encoder {
 					socket = new Socket(this.masterHostName, 9996);
 					break;
 				} catch(Exception e) {
-					Thread.sleep(1000);
+					Thread.sleep(100);
 				}
 			}
 			
@@ -191,7 +191,7 @@ public final class Encoder {
 						socket = new Socket(hostPortPairArray[i].hostName, hostPortPairArray[i].port);
 						break;
 					} catch(Exception e) {
-						Thread.sleep(1000);
+						Thread.sleep(100);
 					}
 				}
 				

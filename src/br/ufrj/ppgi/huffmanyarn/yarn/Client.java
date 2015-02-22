@@ -167,27 +167,13 @@ public class Client {
 
 			// Check app status
 			try {
-				Thread.sleep(5000);
+				Thread.sleep(500);
 			} catch (InterruptedException e) {
 				LOG.debug("Thread sleep in monitoring loop interrupted");
 			}
 
 			// Get application report for the appId we are interested in 
 			ApplicationReport report = yarnClient.getApplicationReport(appId);
-
-			LOG.info("Got application report from ASM for" + ", appId="
-					+ appId.getId() + ", clientToAMToken="
-					+ report.getClientToAMToken() + ", appDiagnostics="
-					+ report.getDiagnostics() + ", appMasterHost="
-					+ report.getHost() + ", appQueue=" + report.getQueue()
-					+ ", appMasterRpcPort=" + report.getRpcPort()
-					+ ", appStartTime=" + report.getStartTime()
-					+ ", yarnAppState="
-					+ report.getYarnApplicationState().toString()
-					+ ", distributedFinalState="
-					+ report.getFinalApplicationStatus().toString()
-					+ ", appTrackingUrl=" + report.getTrackingUrl()
-					+ ", appUser=" + report.getUser());
 
 			YarnApplicationState state = report.getYarnApplicationState();
 			FinalApplicationStatus dsStatus = report.getFinalApplicationStatus();
