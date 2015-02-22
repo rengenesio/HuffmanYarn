@@ -362,7 +362,7 @@ public final class Encoder {
 	
 	public void codificationToHDFS() throws IOException {
 		FileSystem fs = FileSystem.get(this.conf);
-		Path path = new Path(fileName + ".dir/codification");
+		Path path = new Path(fileName + ".yarndir/codification");
 		FSDataOutputStream f = fs.create(path);
 		
 		byte[] codificationSerialized = SerializationUtility.serializeCodificationArray(this.codificationArray);
@@ -372,7 +372,7 @@ public final class Encoder {
 	
     public void memoryCompressor() throws IOException {
     	FileSystem fs = FileSystem.get(this.conf);
-		Path path = new Path(fileName + ".dir/compressed/part-" + String.format("%08d", this.inputPartId));
+		Path path = new Path(fileName + ".yarndir/compressed/part-" + String.format("%08d", this.inputPartId));
 		
 		FSDataOutputStream f = fs.create(path);
 		
@@ -403,7 +403,6 @@ public final class Encoder {
         	f.write(buffer.b);
         }
         
-
         f.close();
 }
 

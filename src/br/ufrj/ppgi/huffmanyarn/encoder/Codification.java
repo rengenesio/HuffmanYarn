@@ -32,8 +32,6 @@ public class Codification {
 		b[0] = this.symbol;
 		b[1] = this.size;
 		System.arraycopy(this.code, 0, b, 2, this.size);
-		//for (int i = 0; i < this.size; i++)
-		//	b[i + 2] = code[i];
 
 		return b;
 	}

@@ -20,11 +20,11 @@ public class Main {
 		in = new String(args[0]);
 		out = new String(in);
 		cb = new String(in);
-		out += ".dir/compressed/";
-		cb += ".dir/codification";
+		out += ".yarndir/compressed/";
+		cb += ".yarndir/codification";
 
 		try {
-			fs.delete(new Path(args[0] + ".dir"), true);
+			fs.delete(new Path(args[0] + ".yarndir"), true);
 		} catch(Exception ex) { }
 			
 
@@ -42,21 +42,21 @@ public class Main {
 		t = t2 - t1;
 		System.out.println(t/1000000000.0 + " s (encoder)");
 
-//		in = new String(args[0]);
-//		out = new String(in);
-//		cb = new String(in);
-//		in += ".dir/compressed/";
-//		out += ".dir/decompressed";
-//		cb += ".dir/codification";
-//		
-//		System.out.println(in);
-//		System.out.println(out);
-//		System.out.println(cb);
-//		
-//		t1 = System.nanoTime();
-//		new Decoder(in, out, cb);
-//		t2 = System.nanoTime();
-//		t = t2 - t1;
-//		System.out.println(t/1000000000.0 + " s (decoder)");
+		in = new String(args[0]);
+		out = new String(in);
+		cb = new String(in);
+		in += ".yarndir/compressed/";
+		out += ".yarndir/decompressed";
+		cb += ".yarndir/codification";
+		
+		System.out.println(in);
+		System.out.println(out);
+		System.out.println(cb);
+		
+		t1 = System.nanoTime();
+		new Decoder(in, out, cb);
+		t2 = System.nanoTime();
+		t = t2 - t1;
+		System.out.println(t/1000000000.0 + " s (decoder)");
 	}
 }
