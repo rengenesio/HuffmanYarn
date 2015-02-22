@@ -12,4 +12,12 @@ public class Defines {
 	
 	public static final int containerMemory = 512;
 	public static final int containerVCores = 1;
+	
+	
+	
+	public static final String pathSuffix = ".yarndir/";
+	public static final String compressedPath = "compressed/";
+	public static final String compressedFileName = "part-";
+	public static final String codificationFileName = "codification";
+	public static final String decompressedFileName = "decompressed";
 }

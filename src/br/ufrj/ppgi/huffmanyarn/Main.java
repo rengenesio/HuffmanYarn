@@ -12,7 +12,7 @@ import br.ufrj.ppgi.huffmanyarn.yarn.Client;
 public class Main {
 
 	public static void main(String[] args) throws Exception {
-		if(args.length < 2) { throw new IllegalArgumentException("Falta(m) parametro(s)"); }
+		if(args.length < 2) { System.out.println("Falta(m) parametro(s)!"); return; }
 		
 		boolean encoder = false;
 		boolean decoder = false;
@@ -34,54 +34,35 @@ public class Main {
 		}
 		
 		if(encoder) {
-			long t, t1, t2;
-			String in, out, cb;
+			long totalTime, startTime, endTime;
+
 			Configuration conf = new Configuration();
 			FileSystem fs = FileSystem.get(conf);
 	
-			in = new String(args[0]);
-			out = new String(in);
-			cb = new String(in);
-			out += ".yarndir/compressed/";
-			cb += ".yarndir/codification";
-	
 			try {
-				fs.delete(new Path(args[0] + ".yarndir"), true);
+				fs.delete(new Path(fileName + Defines.pathSuffix), true);
 			} catch(Exception ex) { }
 				
-	
-			t1 = System.nanoTime();
+			startTime = System.nanoTime();
 			Client client = new Client(args);
+			if (client.run()) { System.out.println("Compressão completa!"); } else { System.out.println("Erro durante a compressão"); return; }
+			endTime = System.nanoTime();
 			
-			if (client.run()) {
-				System.out.println("Compressão completa!");
-			}
-			else {
-				System.out.println("Erro durante a compressão");
-			}
+			totalTime = endTime - startTime;
 			
-			t2 = System.nanoTime();
-			t = t2 - t1;
-			System.out.println(t/1000000000.0 + " s (encoder)");
+			System.out.println(totalTime/1000000000.0 + " s (encoder)");
 		}
 
 		if(decoder) {
-			in = new String(args[0]);
-			out = new String(in);
-			cb = new String(in);
-			in += ".yarndir/compressed/";
-			out += ".yarndir/decompressed";
-			cb += ".yarndir/codification";
+			long totalTime, startTime, endTime;
 			
-			System.out.println(in);
-			System.out.println(out);
-			System.out.println(cb);
+			startTime = System.nanoTime();
+			new Decoder(fileName);
+			endTime = System.nanoTime();
 			
-			t1 = System.nanoTime();
-			new Decoder(in, out, cb);
-			t2 = System.nanoTime();
-			t = t2 - t1;
-			System.out.println(t/1000000000.0 + " s (decoder)");
+			totalTime = endTime - startTime;
+			
+			System.out.println(totalTime / 1000000000.0 + " s (decoder)");
 		}
 	}
 }
